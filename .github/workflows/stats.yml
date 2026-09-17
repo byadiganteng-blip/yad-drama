@@ -1,0 +1,46 @@
+name: Stats Report
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          cd scripts
+          npm install
+      
+      - name: Generate stats
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          cd scripts
+          node stats.js
+      
+      - name: Upload stats
+        uses: actions/upload-artifact@v4
+        with:
+          name: stats-report
+          path: scripts/stats/latest.json
+          retention-days: 90
+      
+      - name: Create release
+        run: |
+          gh release delete stats-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create stats-latest \
+            --title "Stats $(date +%Y-%m-%d)" \
+            --notes "Weekly stats report" \
+            scripts/stats/latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
