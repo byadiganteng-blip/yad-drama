@@ -1,0 +1,51 @@
+name: Deploy Firebase Rules
+
+on:
+  push:
+    paths:
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - '.github/workflows/deploy-firebase.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+      
+      - name: Authenticate Firebase
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" | base64 -d > /tmp/firebase-sa.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json" >> $GITHUB_ENV
+      
+      - name: Deploy Firestore Rules
+        run: |
+          firebase deploy --only firestore:rules --project yad-video-editor --non-interactive
+      
+      - name: Deploy Firestore Indexes
+        run: |
+          firebase deploy --only firestore:indexes --project yad-video-editor --non-interactive
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Firebase Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Project: yad-video-editor" >> $GITHUB_STEP_SUMMARY
+          echo "- Rules: deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- Indexes: deployed" >> $GITHUB_STEP_SUMMARY
