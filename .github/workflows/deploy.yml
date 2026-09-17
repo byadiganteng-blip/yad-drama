@@ -3,12 +3,26 @@ name: Deploy Website
 on:
   push:
     branches: [main]
+    paths:
+      - 'index.html'
+      - 'watch.html'
+      - 'coin.html'
+      - 'login.html'
+      - 'profile.html'
+      - 'admin.html'
+      - 'css/**'
+      - 'js/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   deploy:
