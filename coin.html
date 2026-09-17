@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koin - YAD Drama</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="navbar">
+  <div class="nav-left"><a href="index.html" class="logo">YAD Drama</a></div>
+  <div class="nav-right">
+    <span id="coin-balance" class="coin-badge">💰 0</span>
+  </div>
+</header>
+
+<main class="coin-container">
+  <div class="coin-hero">
+    <h1>💰 Saldo Koin</h1>
+    <div class="balance-big" id="balance-big">0</div>
+    <p class="balance-sub">koin</p>
+    <p class="balance-value">≈ Rp <span id="balance-rupiah">0</span></p>
+  </div>
+
+  <div class="coin-stats">
+    <div class="stat-box">
+      <span class="stat-label">Total Earned</span>
+      <span class="stat-value" id="total-earned">0</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-label">Total Withdrawn</span>
+      <span class="stat-value" id="total-withdrawn">0</span>
+    </div>
+  </div>
+
+  <div class="withdraw-section">
+    <h2>Tarik Koin</h2>
+    <p class="withdraw-info">Minimal 10.000 koin (Rp 10.000)</p>
+    <form id="withdraw-form" class="withdraw-form">
+      <div class="form-group">
+        <label>Jumlah Koin</label>
+        <input type="number" id="withdraw-amount" min="10000" step="1000" required>
+      </div>
+      <div class="form-group">
+        <label>Metode</label>
+        <select id="withdraw-method" required>
+          <option value="dana">DANA</option>
+          <option value="ovo">OVO</option>
+          <option value="gopay">GoPay</option>
+          <option value="bank">Bank</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nomor Akun</label>
+        <input type="text" id="withdraw-account" required>
+      </div>
+      <div class="form-group">
+        <label>Nama Akun</label>
+        <input type="text" id="withdraw-name" required>
+      </div>
+      <button type="submit" class="btn-primary">Ajukan Withdraw</button>
+    </form>
+  </div>
+
+  <div class="history-section">
+    <h2>Riwayat Transaksi</h2>
+    <div id="transaction-list" class="transaction-list"></div>
+  </div>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, updateDoc, increment, addDoc, serverTimestamp, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBsplpeXg1-WyO4MtbFNqS6pEUzJ0lh_DA",
+  authDomain: "yad-video-editor.firebaseapp.com",
+  projectId: "yad-video-editor",
+  storageBucket: "yad-video-editor.firebasestorage.app",
+  messagingSenderId: "954465770137",
+  appId: "1:954465770137:web:25502420bb6a8418bd3608"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUser = null;
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href = 'login.html'; return; }
+  currentUser = user;
+  await loadCoinPage(user.uid);
+});
+
+async function loadCoinPage(uid) {
+  const userDoc = await getDoc(doc(db, 'users', uid));
+  if (!userDoc.exists()) return;
+  const data = userDoc.data();
+  
+  document.getElementById('balance-big').textContent = (data.coins || 0).toLocaleString();
+  document.getElementById('balance-rupiah').textContent = (data.coins || 0).toLocaleString('id-ID');
+  document.getElementById('total-earned').textContent = (data.total_earned || 0).toLocaleString();
+  document.getElementById('total-withdrawn').textContent = (data.total_withdrawn || 0).toLocaleString();
+  document.getElementById('coin-balance').textContent = '💰 ' + (data.coins || 0).toLocaleString();
+  
+  loadTransactions(uid);
+}
+
+async function loadTransactions(uid) {
+  const q = query(collection(db, 'coin_transactions'), where('user_id', '==', uid));
+  const snap = await getDocs(q);
+  const txs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  txs.sort((a, b) => (b.created_at?.toMillis?.() || 0) - (a.created_at?.toMillis?.() || 0));
+  
+  const container = document.getElementById('transaction-list');
+  container.innerHTML = '';
+  
+  if (txs.length === 0) {
+    container.innerHTML = '<p style="color:#999;font-size:14px;">Belum ada transaksi</p>';
+    return;
+  }
+  
+  txs.slice(0, 20).forEach(tx => {
+    const div = document.createElement('div');
+    div.className = 'transaction-item';
+    const sign = tx.amount > 0 ? '+' : '';
+    const cls = tx.amount > 0 ? 'positive' : 'negative';
+    div.innerHTML = `
+      <div>
+        <div>${tx.description || tx.type}</div>
+        <div style="font-size:11px;color:#999;">${tx.created_at ? new Date(tx.created_at.toMillis()).toLocaleString('id-ID') : '-'}</div>
+      </div>
+      <div class="amount ${cls}">${sign}${(tx.amount || 0).toLocaleString()}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+document.getElementById('withdraw-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const amount = parseInt(document.getElementById('withdraw-amount').value);
+  const method = document.getElementById('withdraw-method').value;
+  const account = document.getElementById('withdraw-account').value;
+  const name = document.getElementById('withdraw-name').value;
+  
+  if (amount < 10000) { toast('Minimal 10.000 koin'); return; }
+  
+  const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+  const coins = userDoc.data().coins || 0;
+  if (coins < amount) { toast('Saldo tidak cukup'); return; }
+  
+  try {
+    await addDoc(collection(db, 'withdrawals'), {
+      user_id: currentUser.uid,
+      amount: amount,
+      method: method,
+      account_number: account,
+      account_name: name,
+      status: 'pending',
+      created_at: serverTimestamp()
+    });
+    
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      coins: increment(-amount),
+      total_withdrawn: increment(amount)
+    });
+    
+    toast('Withdraw diajukan!');
+    document.getElementById('withdraw-form').reset();
+    setTimeout(() => location.reload(), 1500);
+  } catch (err) { toast('Error: ' + err.message); }
+});
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 3000);
+}
+</script>
+</body>
+</html>
