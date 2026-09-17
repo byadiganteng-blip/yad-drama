@@ -1,0 +1,87 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // USERS — hanya akses data sendiri
+    // ============================================
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null 
+                    && request.auth.uid == userId
+                    && request.resource.data.coins == 0
+                    && request.resource.data.total_earned == 0
+                    && request.resource.data.total_withdrawn == 0;
+      allow update: if request.auth != null 
+                    && request.auth.uid == userId
+                    && request.resource.data.coins >= 0;
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // DRAMAS — public read, admin write
+    // ============================================
+    match /dramas/{dramaId} {
+      allow read: if true;
+      allow write: if request.auth != null 
+                   && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.is_admin == true;
+    }
+    
+    // ============================================
+    // EPISODES — public read, admin write
+    // ============================================
+    match /episodes/{episodeId} {
+      allow read: if true;
+      allow write: if request.auth != null 
+                   && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.is_admin == true;
+    }
+    
+    // ============================================
+    // WATCH HISTORY — user sendiri
+    // ============================================
+    match /watch_history/{docId} {
+      allow read: if request.auth != null 
+                  && resource.data.user_id == request.auth.uid;
+      allow create: if request.auth != null 
+                    && request.resource.data.user_id == request.auth.uid
+                    && request.resource.data.rewarded_coins <= 30;
+      allow update: if request.auth != null 
+                    && resource.data.user_id == request.auth.uid
+                    && request.resource.data.rewarded_coins <= 30;
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // COIN TRANSACTIONS — user sendiri, immutable
+    // ============================================
+    match /coin_transactions/{txId} {
+      allow read: if request.auth != null 
+                  && resource.data.user_id == request.auth.uid;
+      allow create: if request.auth != null 
+                    && request.resource.data.user_id == request.auth.uid
+                    && request.resource.data.amount <= 30;
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // WITHDRAWALS — user sendiri, tidak bisa update
+    // ============================================
+    match /withdrawals/{wdId} {
+      allow read: if request.auth != null 
+                  && resource.data.user_id == request.auth.uid;
+      allow create: if request.auth != null 
+                    && request.resource.data.user_id == request.auth.uid
+                    && request.resource.data.amount >= 10000
+                    && request.resource.data.status == 'pending';
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // DEFAULT — deny all
+    // ============================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
