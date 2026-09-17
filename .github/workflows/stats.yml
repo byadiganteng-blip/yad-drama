@@ -5,6 +5,13 @@ on:
     - cron: '0 3 * * 1'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: "stats"
+  cancel-in-progress: false
+
 jobs:
   stats:
     runs-on: ubuntu-latest
@@ -40,7 +47,7 @@ jobs:
           gh release delete stats-latest --yes --cleanup-tag 2>/dev/null || true
           gh release create stats-latest \
             --title "Stats $(date +%Y-%m-%d)" \
-            --notes "Weekly stats report" \
+            --notes "Weekly stats" \
             scripts/stats/latest.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
