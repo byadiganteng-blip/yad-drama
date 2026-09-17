@@ -9,14 +9,17 @@ on:
       - '.github/workflows/deploy-firebase.yml'
   workflow_dispatch:
 
+concurrency:
+  group: "firebase"
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,12 +43,3 @@ jobs:
       - name: Deploy Firestore Indexes
         run: |
           firebase deploy --only firestore:indexes --project yad-video-editor --non-interactive
-      
-      - name: Summary
-        if: always()
-        run: |
-          echo "## Firebase Deploy Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Project: yad-video-editor" >> $GITHUB_STEP_SUMMARY
-          echo "- Rules: deployed" >> $GITHUB_STEP_SUMMARY
-          echo "- Indexes: deployed" >> $GITHUB_STEP_SUMMARY
