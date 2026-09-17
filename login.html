@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - YAD Drama</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="navbar">
+  <div class="nav-left"><a href="index.html" class="logo">YAD Drama</a></div>
+</header>
+
+<main class="auth-container">
+  <div class="auth-box">
+    <div id="login-view">
+      <h1>Login</h1>
+      <form id="login-form" class="auth-form">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="login-email" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" required>
+        </div>
+        <button type="submit" class="btn-primary">Login</button>
+      </form>
+      <p class="auth-switch">Belum punya akun? <a href="#" onclick="showRegister();return false;">Daftar</a></p>
+    </div>
+
+    <div id="register-view" class="hidden">
+      <h1>Daftar</h1>
+      <form id="register-form" class="auth-form">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="register-email" required>
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="register-username" required>
+        </div>
+        <div class="form-group">
+          <label>Password (min 6)</label>
+          <input type="password" id="register-password" required minlength="6">
+        </div>
+        <button type="submit" class="btn-primary">Daftar</button>
+      </form>
+      <p class="auth-switch">Sudah punya akun? <a href="#" onclick="showLogin();return false;">Login</a></p>
+    </div>
+  </div>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+window.showRegister = function() {
+  document.getElementById('login-view').classList.add('hidden');
+  document.getElementById('register-view').classList.remove('hidden');
+};
+window.showLogin = function() {
+  document.getElementById('register-view').classList.add('hidden');
+  document.getElementById('login-view').classList.remove('hidden');
+};
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBsplpeXg1-WyO4MtbFNqS6pEUzJ0lh_DA",
+  authDomain: "yad-video-editor.firebaseapp.com",
+  projectId: "yad-video-editor",
+  storageBucket: "yad-video-editor.firebasestorage.app",
+  messagingSenderId: "954465770137",
+  appId: "1:954465770137:web:25502420bb6a8418bd3608"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await signInWithEmailAndPassword(auth,
+      document.getElementById('login-email').value,
+      document.getElementById('login-password').value
+    );
+    toast('Login berhasil!');
+    setTimeout(() => window.location.href = 'index.html', 1000);
+  } catch (err) { toast('Error: ' + err.message); }
+});
+
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const cred = await createUserWithEmailAndPassword(auth,
+      document.getElementById('register-email').value,
+      document.getElementById('register-password').value
+    );
+    
+    await setDoc(doc(db, 'users', cred.user.uid), {
+      email: cred.user.email,
+      username: document.getElementById('register-username').value,
+      coins: 0,
+      total_earned: 0,
+      total_withdrawn: 0,
+      created_at: serverTimestamp()
+    });
+    
+    toast('Registrasi berhasil!');
+    setTimeout(() => window.location.href = 'index.html', 1500);
+  } catch (err) { toast('Error: ' + err.message); }
+});
+</script>
+</body>
+</html>
